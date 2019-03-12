@@ -1,0 +1,9 @@
+*.pyc
+.DS_Store
+.env
+.idea/
+venv/
+venv-27/
+*.h5
+*.bin
+credentials/
