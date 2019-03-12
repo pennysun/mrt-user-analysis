@@ -8,10 +8,58 @@ import plotly.graph_objs as go
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 plotly.tools.set_credentials_file(username='penny.sun', api_key='aBIJh98JIvQGpELF9qOv')
 
-df = pd.read_csv('data/hwid_demographic.csv', encoding='utf-8', dtype=object)
+# download file
+def partial(total_byte_len, part_size_limit):
+    s = []
+    for p in range(0, total_byte_len, part_size_limit):
+        last = min(total_byte_len - 1, p + part_size_limit - 1)
+        s.append([p, last])
+    return s
+
+def GD_download_file(service, file_id):
+    drive_file = service.files().get(fileId=file_id).execute()
+    download_url = drive_file.get('downloadUrl')
+    total_size = int(drive_file.get('fileSize'))
+    s = partial(total_size, 100000000) # I'm downloading BIG files, so 100M chunk size is fine for me
+    title = drive_file.get('title')
+    originalFilename = drive_file.get('originalFilename')
+    filename = './' + originalFilename
+    if download_url:
+        with open(filename, 'wb') as file:
+            print("Bytes downloaded: ")
+            for bytes in s:
+                headers = {"Range" : 'bytes=%s-%s' % (bytes[0], bytes[1])}
+                resp, content = service._http.request(download_url, headers=headers)
+                if resp.status == 206 :
+                    file.write(content)
+                    file.flush()
+                else:
+                    print('An error occurred: %s' % resp)
+                    return None
+                print(str(bytes[1])+"...")
+        return title, filename
+    else:
+        return None
+
+gauth = GoogleAuth()
+#gauth.CommandLineAuth() #requires cut and paste from a browser
+gauth.LocalWebserverAuth()
+
+FILE_ID = '12hw86e62G9P3MT15o16tcQmqiZYJMFBq'
+
+drive = GoogleDrive(gauth)
+service = gauth.service
+#file = drive.CreateFile({'id':FILE_ID})    # Use this to get file metadata
+title, filename = GD_download_file(service, FILE_ID)
+
+
+df = pd.read_csv(filename, encoding='utf-8', dtype=object)
+
 #station
 station_group = df.groupby('station')
 station_group_cnt = df.groupby('station', as_index=False).size().reset_index(name='counts').sort_values('counts', ascending=True)
